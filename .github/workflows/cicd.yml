@@ -10,7 +10,7 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      # Step 1 — Checkout repo
+      # Step 1 — Checkout repository
       - name: Checkout code
         uses: actions/checkout@v4
 
@@ -37,7 +37,7 @@ jobs:
           ./aws/install --bin-dir $HOME/.local/bin --install-dir $HOME/.aws-cli
           echo "$HOME/.local/bin" >> $GITHUB_PATH
 
-      # Step 6 — Verify AWS CLI
+      # Step 6 — Verify AWS CLI version
       - name: Check AWS CLI version
         run: aws --version
 
@@ -51,12 +51,10 @@ jobs:
       # Step 8 — Invoke Lambda After Deployment
       - name: Invoke Lambda Function
         run: |
-          echo '{"message":"New code pushed to main branch"}' > payload.json
           aws lambda invoke \
             --function-name NotifyEmailLambda \
-            --payload file://payload.json \
+            --payload '{"message":"New code pushed to main branch"}' \
             response.json
-
 
       # Step 9 — Show Lambda Response
       - name: Show Lambda Response
