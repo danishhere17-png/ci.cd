@@ -10,7 +10,6 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-
       # Step 1 — Checkout repo
       - name: Checkout code
         uses: actions/checkout@v4
@@ -24,15 +23,13 @@ jobs:
 
       # Step 3 — Build Docker Image
       - name: Build Docker image
-        run: |
-          docker build -t ${{ secrets.DOCKERHUB_USERNAME }}/my-html-site:latest .
+        run: docker build -t ${{ secrets.DOCKERHUB_USERNAME }}/my-html-site:latest .
 
       # Step 4 — Push Docker Image
       - name: Push Docker image
-        run: |
-          docker push ${{ secrets.DOCKERHUB_USERNAME }}/my-html-site:latest
+        run: docker push ${{ secrets.DOCKERHUB_USERNAME }}/my-html-site:latest
 
-      # Step 5 — Install AWS CLI v2
+      # Step 5 — Install AWS CLI v2 (local install, avoids sudo)
       - name: Install AWS CLI v2
         run: |
           curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
@@ -51,17 +48,14 @@ jobs:
           aws configure set aws_secret_access_key ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws configure set region us-east-1
 
-      # Step 8 — Trigger Lambda After Deployment
+      # Step 8 — Invoke Lambda After Deployment
       - name: Invoke Lambda Function
         run: |
-          # Use printf to create valid JSON payload
-          printf '%s\n' '{"message":"New code pushed to main branch"}' > payload.json
-
           aws lambda invoke \
             --function-name NotifyEmailLambda \
             --payload file://payload.json \
             response.json
 
-      # Step 9 — Optional: Show Lambda output
+      # Step 9 — Show Lambda Response
       - name: Show Lambda Response
         run: cat response.json
