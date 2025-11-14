@@ -1,4 +1,4 @@
-name: Build, Push & Notify
+name: Build, Push Docker Image & Trigger Lambda
 
 on:
   push:
@@ -6,46 +6,52 @@ on:
       - main
 
 jobs:
-  build-push-notify:
+  build-and-trigger:
     runs-on: ubuntu-latest
 
     steps:
-      # Checkout
-      - name: Checkout repository
+
+      # Step 1 — Checkout repo
+      - name: Checkout code
         uses: actions/checkout@v4
 
-      # Docker login
-      - name: Log in to Docker Hub
+      # Step 2 — Login to Docker Hub
+      - name: Login to Docker Hub
         uses: docker/login-action@v3
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-      # Build Image
+      # Step 3 — Build Docker Image
       - name: Build Docker image
         run: |
           docker build -t ${{ secrets.DOCKERHUB_USERNAME }}/my-html-site:latest .
 
-      # Push Image
+      # Step 4 — Push Docker Image
       - name: Push Docker image
         run: |
           docker push ${{ secrets.DOCKERHUB_USERNAME }}/my-html-site:latest
 
-      # Install AWS CLI
+      # Step 5 — Install AWS CLI (correct way)
       - name: Install AWS CLI
         run: |
-          sudo apt-get update
-          sudo apt-get install -y awscli
+          pip install awscli
 
-      # Trigger Lambda Notification
-      - name: Trigger Lambda
+      # Step 6 — Configure AWS Credentials
+      - name: Configure AWS Credentials
+        run: |
+          aws configure set aws_access_key_id ${{ secrets.AWS_ACCESS_KEY }}
+          aws configure set aws_secret_access_key ${{ secrets.AWS_SECRET_KEY }}
+          aws configure set default.region us-east-1
+
+      # Step 7 — Trigger Lambda After Deployment
+      - name: Invoke Lambda Function
         run: |
           aws lambda invoke \
-            --function-name NotifyEmailLambda \
-            --payload '{}' \
-            --region us-east-1 \
-            lambda_output.json
-        env:
-          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY }}
-          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_KEY }}
-          AWS_DEFAULT_REGION: us-east-1
+            --function-name sendEmailNotification \
+            --payload '{"message":"New code pushed to main branch"}' \
+            response.json
+
+      # Optional: Show Lambda output
+      - name: Show Lambda Response
+        run: cat response.json
