@@ -54,7 +54,14 @@ jobs:
       # Step 8 — Trigger Lambda After Deployment
       - name: Invoke Lambda Function
         run: |
+          cat > payload.json << 'EOF'
+          {
+            "message": "New code pushed to main branch"
+          }
+          EOF
+
           aws lambda invoke \
             --function-name NotifyEmailLambda \
-            --payload '{"message":"New code pushed to main branch"}' \
-            response.
+            --payload file://payload.json \
+            response.json
+
