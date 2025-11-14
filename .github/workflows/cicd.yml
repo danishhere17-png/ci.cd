@@ -10,7 +10,7 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      # Step 1 — Checkout repository
+      # Step 1 — Checkout repo
       - name: Checkout code
         uses: actions/checkout@v4
 
@@ -37,7 +37,7 @@ jobs:
           ./aws/install --bin-dir $HOME/.local/bin --install-dir $HOME/.aws-cli
           echo "$HOME/.local/bin" >> $GITHUB_PATH
 
-      # Step 6 — Verify AWS CLI version
+      # Step 6 — Verify AWS CLI
       - name: Check AWS CLI version
         run: aws --version
 
@@ -48,12 +48,13 @@ jobs:
           aws configure set aws_secret_access_key ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws configure set region us-east-1
 
-      # Step 8 — Invoke Lambda After Deployment
+      # Step 8 — Invoke Lambda After Deployment (fixed)
       - name: Invoke Lambda Function
         run: |
+          printf '{"message":"New code pushed to main branch"}' | \
           aws lambda invoke \
             --function-name NotifyEmailLambda \
-            --payload '{"message":"New code pushed to main branch"}' \
+            --payload file:///dev/stdin \
             response.json
 
       # Step 9 — Show Lambda Response
