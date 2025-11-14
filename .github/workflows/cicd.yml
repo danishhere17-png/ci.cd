@@ -1,70 +1,74 @@
-name: Build, Push Docker Image & Trigger Lambda
+name: CI/CD with Docker + Lambda Notification
 
 on:
   push:
-    branches:
-      - main
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
 
 jobs:
-  build-and-trigger:
+  build-and-notify:
     runs-on: ubuntu-latest
 
     steps:
-      # Step 1 — Checkout repo
-      - name: Checkout code
+      # Step 1 — Checkout repository
+      - name: Checkout repository
         uses: actions/checkout@v4
 
-      # Step 2 — Login to Docker Hub
-      - name: Login to Docker Hub
+      # Step 2 — Set up Docker Buildx
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      # Step 3 — Login to Docker Hub
+      - name: Login to DockerHub
         uses: docker/login-action@v3
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-      # Step 3 — Build Docker Image
-      - name: Build Docker image
-        run: docker build -t ${{ secrets.DOCKERHUB_USERNAME }}/my-html-site:latest .
+      # Step 4 — Build and push Docker image
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          push: true
+          tags: ${{ secrets.DOCKERHUB_USERNAME }}/my-html-site:latest
 
-      # Step 4 — Push Docker Image
-      - name: Push Docker Image
-        run: docker push ${{ secrets.DOCKERHUB_USERNAME }}/my-html-site:latest
-
-      # Step 5 — Install AWS CLI v2
-      - name: Install AWS CLI v2
+      # Step 5 — Ensure AWS CLI v2 is installed
+      - name: Ensure AWS CLI
         run: |
-          curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
-          unzip awscliv2.zip
-          ./aws/install --bin-dir $HOME/.local/bin --install-dir $HOME/.aws-cli
-          echo "$HOME/.local/bin" >> $GITHUB_PATH
+          if ! command -v aws &> /dev/null; then
+            echo "Installing AWS CLI v2..."
+            curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
+            unzip -q awscliv2.zip
+            sudo ./aws/install
+          fi
+          aws --version
 
-      # Step 6 — Verify AWS CLI
-      - name: Check AWS CLI version
-        run: aws --version
-
-      # Step 7 — Configure AWS Credentials
-      - name: Configure AWS Credentials
+      # Step 6 — Trigger Lambda Notification
+      - name: Notify via AWS Lambda
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          AWS_REGION: ${{ secrets.AWS_REGION }}
+          LAMBDA_NAME: NotifyEmailLambda
         run: |
-          aws configure set aws_access_key_id ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws configure set aws_secret_access_key ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws configure set region us-east-1
+          echo "Preparing Lambda payload..."
+          payload=$(jq -n \
+            --arg msg "New code pushed to main branch" \
+            --arg repo "$GITHUB_REPOSITORY" \
+            --arg branch "$GITHUB_REF_NAME" \
+            --arg actor "$GITHUB_ACTOR" \
+            --arg image "${{ secrets.DOCKERHUB_USERNAME }}/my-html-site:latest" \
+            '{message:$msg, repository:$repo, branch:$branch, actor:$actor, image:$image}')
 
-      # Step 8 — Create payload.json dynamically
-      - name: Create Lambda payload
-        run: |
-          cat > payload.json <<EOF
-          {
-            "message": "New code pushed to main branch"
-          }
-          EOF
-
-      # Step 9 — Invoke Lambda Function
-      - name: Invoke Lambda
-        run: |
+          echo "Invoking Lambda $LAMBDA_NAME..."
           aws lambda invoke \
-            --function-name NotifyEmailLambda \
-            --payload file://payload.json \
+            --function-name "$LAMBDA_NAME" \
+            --region "$AWS_REGION" \
+            --payload "$payload" \
+            --cli-binary-format raw-in-base64-out \
             response.json
 
-      # Step 10 — Show Lambda response
-      - name: Show Lambda Response
-        run: cat response.json
+          echo "Lambda Response:"
+          cat response.json
