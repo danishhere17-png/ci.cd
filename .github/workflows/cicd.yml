@@ -26,7 +26,7 @@ jobs:
         run: docker build -t ${{ secrets.DOCKERHUB_USERNAME }}/my-html-site:latest .
 
       # Step 4 — Push Docker Image
-      - name: Push Docker image
+      - name: Push Docker Image
         run: docker push ${{ secrets.DOCKERHUB_USERNAME }}/my-html-site:latest
 
       # Step 5 — Install AWS CLI v2
@@ -48,15 +48,23 @@ jobs:
           aws configure set aws_secret_access_key ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws configure set region us-east-1
 
-      # Step 8 — Invoke Lambda After Deployment (fixed)
-      - name: Invoke Lambda Function
+      # Step 8 — Create payload.json dynamically
+      - name: Create Lambda payload
         run: |
-          printf '{"message":"New code pushed to main branch"}' | \
+          cat > payload.json <<EOF
+          {
+            "message": "New code pushed to main branch"
+          }
+          EOF
+
+      # Step 9 — Invoke Lambda Function
+      - name: Invoke Lambda
+        run: |
           aws lambda invoke \
             --function-name NotifyEmailLambda \
-            --payload file:///dev/stdin \
+            --payload file://payload.json \
             response.json
 
-      # Step 9 — Show Lambda Response
+      # Step 10 — Show Lambda response
       - name: Show Lambda Response
         run: cat response.json
