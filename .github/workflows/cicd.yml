@@ -29,7 +29,7 @@ jobs:
       - name: Push Docker image
         run: docker push ${{ secrets.DOCKERHUB_USERNAME }}/my-html-site:latest
 
-      # Step 5 — Install AWS CLI v2 (local install, avoids sudo)
+      # Step 5 — Install AWS CLI v2
       - name: Install AWS CLI v2
         run: |
           curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
@@ -48,12 +48,12 @@ jobs:
           aws configure set aws_secret_access_key ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws configure set region us-east-1
 
-      # Step 8 — Invoke Lambda After Deployment
+      # Step 8 — Invoke Lambda with inline JSON payload (safe)
       - name: Invoke Lambda Function
         run: |
           aws lambda invoke \
             --function-name NotifyEmailLambda \
-            --payload file://payload.json \
+            --payload '{"message":"New code pushed to main branch"}' \
             response.json
 
       # Step 9 — Show Lambda Response
