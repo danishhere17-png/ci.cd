@@ -48,13 +48,15 @@ jobs:
           aws configure set aws_secret_access_key ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws configure set region us-east-1
 
-      # Step 8 — Invoke Lambda with inline JSON payload (safe)
+      # Step 8 — Invoke Lambda After Deployment
       - name: Invoke Lambda Function
         run: |
+          echo '{"message":"New code pushed to main branch"}' > payload.json
           aws lambda invoke \
             --function-name NotifyEmailLambda \
-            --payload '{"message":"New code pushed to main branch"}' \
+            --payload file://payload.json \
             response.json
+
 
       # Step 9 — Show Lambda Response
       - name: Show Lambda Response
